@@ -68,6 +68,14 @@ high_school_politics
 high_school_geography
 high_school_history
 high_school_chinese
+middle_school_biology
+middle_school_chemistry
+middle_school_physics
+middle_school_mathematics
+middle_school_politics
+middle_school_geography
+middle_school_history
+middle_school_chinese
 TXT
 
 
@@ -77,6 +85,7 @@ module load Miniforge3 && conda activate qwen312
 export CEVAL_DATA_DIR=~/offline_bundle/ceval/ceval-exam
 export PYTHONPATH=$(git rev-parse --show-toplevel):$PYTHONPATH
 
+#zero-shot
 printf "%-26s %s\n" "subject" "acc"
 printf "%-26s %s\n" "-------" "----"
 while read -r s; do
@@ -86,44 +95,18 @@ while read -r s; do
   printf "%-26s %s\n" "$s" "${acc:-NA}"
 done < subjects.txt
 
+#few-shot
 
-一键把高中清单替换成初中版：
+printf "%-26s %s\n" "subject" "acc"
+printf "%-26s %s\n" "-------" "----"
+while read -r s; do
+  [[ -z "$s" || "$s" =~ ^# ]] && continue
+  acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                       --subject "$s" --few_shot -k 5 2>&1 \
+        | awk '/^Acc:/{a=$2} END{print a}')
+  printf "%-26s %s\n" "$s" "${acc:-NA}"
+done < subjects.txt
 
-sed -E 's/^(high_school_)/middle_school_/' subjects.txt > subjects_middle_school.txt
-
-可选策略与小优化
-
-更稳的打分：将“首 token 直选”升级为“完整选项对数似然”评分（可加一个开关实现）。
-
-生成式评测：换 Qwen/Qwen3-0.6B-Instruct 并开启 --few_shot/--cot，用正则抽答案。
-
-去除采样参数警告：在 evaluators/qwen.py::__init__ 加入：
-
-self.model.eval()
-cfg = self.model.generation_config
-cfg.do_sample = False
-cfg.temperature = None
-cfg.top_p = None
-cfg.top_k = None
-
-
-这样 generate(..., do_sample=False) 就不会提示 temperature/top_p/top_k 的警告。
-
-常见问题（FAQ）
-
-找不到数据
-确认 CEVAL_DATA_DIR 指向 .../ceval-exam，且存在
-subject/val.csv 或 subject/val-*.parquet（或聚合式 val/<subject>_val.csv）。
-
-Parquet 报错
-安装 pyarrow：pip install -U pyarrow。
-
-成绩波动大
-单科学样本量常见只有 ~18–20，波动正常；看整组（如 High School）均值更稳定。
-
-提交到 GitHub
-结果建议放到 results/（非 outputs/），再 git add results/*.csv && git commit && git push。
-推送失败常见是未配置 SSH key 或 PAT。
 
 致谢（来源标注）
 
