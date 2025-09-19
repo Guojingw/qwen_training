@@ -107,18 +107,24 @@ class Qwen_Evaluator(Evaluator):
                 q = self.format_example(line, include_answer=False, cot=cot)
                 full_prompt = prefix + q
                 text = self._generate_text(full_prompt, max_new_tokens=256,
-                                           temperature=0.2 if not cot else 0.7,
-                                           top_p=0.9, do_sample=True)
+                                        temperature=0.2 if not cot else 0.7,
+                                        top_p=0.9, do_sample=True)
                 completion = text[len(full_prompt):]
                 pred = self._extract_answer_from_text(completion)
                 if pred is None:
-                    # 回退：用 logits 直选提高鲁棒性
-                    pred = self._first_step_logits_choice(full_prompt)
+                    # 回退：按 score_mode 选择判别器
+                    if getattr(self, "score_mode", "logits_first") == "loglik_full":
+                        pred = self._pick_by_full_loglik(full_prompt)
+                    else:
+                        pred = self._first_step_logits_choice(full_prompt)
             else:
-                # zero-shot logits 直选
+                # zero-shot 分支：直接按 score_mode 选择
                 q = self.format_example(line, include_answer=False, cot=False)
                 full_prompt = q
-                pred = self._first_step_logits_choice(full_prompt)
+                if getattr(self, "score_mode", "logits_first") == "loglik_full":
+                    pred = self._pick_by_full_loglik(full_prompt)
+                else:
+                    pred = self._first_step_logits_choice(full_prompt)
 
             correct = 1 if pred == answers[i] else 0
             results.append(pred); scores.append(correct)
@@ -131,3 +137,29 @@ class Qwen_Evaluator(Evaluator):
             out_df['correctness'] = scores
             out_df.to_csv(os.path.join(save_result_dir, f'{subject_name}_test.csv'), index=False, encoding="utf-8")
         return acc_pct
+    
+    # 计算 prompt+target 的条件对数似然：只对 target 部分计分
+    @torch.no_grad()
+    def _cond_loglik(self, prompt: str, target: str) -> float:
+        tok = self.tokenizer(prompt + target, return_tensors="pt").to(self.model.device)
+        ids = tok["input_ids"]
+        # mask 掉 prompt 部分，只对 target 计 loss
+        prompt_len = self.tokenizer(prompt, return_tensors="pt")["input_ids"].shape[1]
+        labels = ids.clone()
+        labels[:, :prompt_len] = -100
+        out = self.model(input_ids=ids, labels=labels)
+        n_tokens = (labels != -100).sum().item()
+        # cross entropy 是平均负对数似然；乘回长度得到总负对数似然
+        return - out.loss.item() * n_tokens
+
+    @torch.no_grad()
+    def _pick_by_full_loglik(self, prompt: str) -> str:
+        # 多种 verbalizer 取最大，鲁棒些
+        cand_templates = [
+            "答案：{}", "答案：{}。", "答案：{}\n", "因此答案是{}。"
+        ]
+        scores = []
+        for ch in ["A","B","C","D"]:
+            best = max(self._cond_loglik(prompt, t.format(ch)) for t in cand_templates)
+            scores.append(best)
+        return self.choices[int(np.argmax(scores))]

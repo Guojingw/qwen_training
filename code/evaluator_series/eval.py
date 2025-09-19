@@ -53,7 +53,8 @@ def main(args):
             choices=choices,
             k=args.ntrain,
             model_name=args.model_name,
-            device=device
+            device=device,
+            score_mode = args.score_mode
         )
     else:
         print("Unknown model name (expected qwen family)")
@@ -88,7 +89,8 @@ def main(args):
         dev_df=dev_df,
         few_shot=args.few_shot,
         save_result_dir=save_result_dir,
-        cot=args.cot
+        cot=args.cot,
+        score_mode = args.score_mode
     )
     print("Acc:", correct_ratio)
 
@@ -100,5 +102,7 @@ if __name__ == "__main__":
     parser.add_argument("--cot", action="store_true")
     parser.add_argument("--subject", "-s", type=str, default="operating_system")
     parser.add_argument("--cuda_device", type=str)
+    parser.add_argument("--score_mode", choices=["logits_first","loglik_full"], default="logits_first")
     args = parser.parse_args()
+    
     main(args)
