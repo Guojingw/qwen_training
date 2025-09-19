@@ -1,18 +1,18 @@
-Qwen3 CEval Evaluator (HF)
+#Qwen3 CEval Evaluator (HF)
 
-Origin / 代码来源标注
+#Origin / 代码来源标注
     本仓库的评测思路与部分结构参考并改写自 HKUST-NLP/C-Eval（原仓库包含 LLaMA 等评测器与数据说明）。
     我们将其中“按 A/B/C/D 选项进行比较”的评测方式适配到了 HuggingFace Transformers，并新增对 Qwen3 等 HF 格式模型的直接评测支持。
     数据集版权归原作者所有；本仓库不包含任何模型权重或数据文件。
 
-Overview / 项目简介
+#Overview / 项目简介
 
   评测 Qwen3-0.6B（或其他 HF CausalLM）在 C-Eval 数据集上的选择题准确率。
 
   支持 logits 直选（对 A/B/C/D 的下一步 token 概率进行比较，零样本更稳）与 生成式解析 两种模式。
 
 
-Repo Structure / 仓库结构（示例）
+#Repo Structure / 仓库结构（示例）
            
 ├─ code/
 │  └─ evaluator_series/
@@ -25,7 +25,7 @@ Repo Structure / 仓库结构（示例）
 ├─ .gitignore
 └─ README.md
 
-Setup / 环境准备
+#Setup / 环境准备
     
     module load Miniforge3
     conda create -n qwen312 python=3.12 -y
@@ -39,7 +39,7 @@ Setup / 环境准备
     # 其余依赖
     pip install "transformers==4.51.0" tokenizers accelerate pandas tqdm sentencepiece huggingface_hub
 
-Data & Model / 数据与模型
+#Data & Model / 数据与模型
 
 下载 C-Eval 数据（学科式目录）：
     
@@ -60,7 +60,7 @@ subject 映射表：
       --local-dir ./model/Qwen3-0.6B --local-dir-use-symlinks False
 
 
-快速开始（单学科）:
+#快速开始（单学科）:
 	
 	cd ~/offline_bundle/qwen_training
 	module load Miniforge3 && conda activate qwen312
@@ -69,12 +69,13 @@ subject 映射表：
 	cd code/evaluator_series
 	python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
 	               --subject high_school_biology
-# 示例输出：
-# [INFO] Using val data for 'high_school_biology': [.../val-00000-of-00001.parquet]
-# Acc: 36.84
+示例输出:
+
+	[INFO] Using val data for 'high_school_biology': [.../val-00000-of-00001.parquet]
+	Acc: 36.84
 
 
-自定义清单 & 仅在终端打印成绩
+#自定义清单 & 仅在终端打印成绩
 
 1）写清单（示例：高中科目）
 	
