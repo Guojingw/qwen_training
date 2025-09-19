@@ -1,0 +1,9 @@
+# 我想跑的科目（初中）
+middle_school_biology
+middle_school_chemistry
+middle_school_physics
+middle_school_mathematics
+middle_school_politics
+middle_school_geography
+middle_school_history
+middle_school_chinese
