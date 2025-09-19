@@ -1,4 +1,13 @@
-/data/
-/logs/
-/.idea/
-code/evaluator_series/evaluators/__pycache__/
+# Python
+__pycache__/
+*.pyc
+
+# 虚拟环境
+.venv/
+
+# 运行产物/大文件（按你的项目自行取舍）
+outputs/
+model/
+ceval/ceval-exam/
+wheels_linux/
+.DS_Store

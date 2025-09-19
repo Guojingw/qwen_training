@@ -2,10 +2,7 @@ import os
 import argparse
 import pandas as pd
 import torch
-from evaluators.chatgpt import ChatGPT_Evaluator
-from evaluators.moss import Moss_Evaluator
-from evaluators.chatglm import ChatGLM_Evaluator
-from evaluators.minimax import MiniMax_Evaluator
+
 from evaluators.qwen import Qwen_Evaluator
 
 import time
@@ -13,30 +10,7 @@ choices = ["A", "B", "C", "D"]
 
 def main(args):
 
-    if "turbo" in args.model_name or "gpt-4" in args.model_name:
-        evaluator=ChatGPT_Evaluator(
-            choices=choices,
-            k=args.ntrain,
-            api_key=args.openai_key,
-            model_name=args.model_name
-        )
-    elif "moss" in args.model_name:
-        evaluator=Moss_Evaluator(
-            choices=choices,
-            k=args.ntrain,
-            model_name=args.model_name
-        )
-    elif "chatglm" in args.model_name:
-        if args.cuda_device:
-            os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_device
-        device = torch.device("cuda")
-        evaluator=ChatGLM_Evaluator(
-            choices=choices,
-            k=args.ntrain,
-            model_name=args.model_name,
-            device=device
-        )
-    elif "qwen" in args.model_name.lower():
+    if "qwen" in args.model_name.lower():
         if args.cuda_device:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_device
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,14 +19,6 @@ def main(args):
             k=args.ntrain,
             model_name=args.model_name,
             device=device
-        )
-    elif "minimax" in args.model_name:
-        evaluator=MiniMax_Evaluator(
-            choices=choices,
-            k=args.ntrain,
-            group_id=args.minimax_group_id,
-            api_key=args.minimax_key,
-            model_name=args.model_name
         )
     else:
         print("Unknown model name")
