@@ -13,27 +13,6 @@ Overview / 项目简介
     
     支持 logits 直选（对 A/B/C/D 的下一步 token 概率进行比较，零样本更稳）与 生成式解析 两种模式。
 
-兼容两种数据目录布局：
-    
-    val/<subject>_val.csv（聚合式）
-    
-    <subject>/val.csv（学科式，Hugging Face 下载的默认结构）
-    
-    可仅评 C-level（大学水平）或指定学科子集；可离线运行。
-    
-    提供 Slurm 批处理示例；支持在 HPC 上一键复现实验。
-
-Features / 特性
-
-HF 模型即插即用（本地目录或 org/name 在线加载）
-
-    --c_level_only 一键筛选大学层级科目（若筛不到会自动回退到“全部有 CSV 的科目”，避免 n=0）
-
-    --mode logits|generate 切换评测策略
-
-    --offline 完全离线（需提前准备模型与数据）
-
-    输出总体与分学科准确率（JSON）
 
 Repo Structure / 仓库结构（示例）
            
