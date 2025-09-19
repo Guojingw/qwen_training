@@ -49,9 +49,9 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 cd code/evaluator_series
 python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
                --subject high_school_biology
-# 示例输出：
-# [INFO] Using val data for 'high_school_biology': [.../val-00000-of-00001.parquet]
-# Acc: 36.84
+示例输出：
+  [INFO] Using val data for 'high_school_biology': [.../val-00000-of-00001.parquet]
+  Acc: 36.84
 
 
 自定义清单 & 仅在终端打印成绩
@@ -141,6 +141,7 @@ while read -r s; do
                        --subject "$s" 2>&1 | awk '/^Acc:/{a=$2} END{print a}')
   printf "%-26s %s\n" "$s" "${acc:-NA}"
 done < subjects.txt
+
 
 
 Notes: default split is val; install pyarrow for Parquet; silence sampling warnings via generation_config as shown above.
