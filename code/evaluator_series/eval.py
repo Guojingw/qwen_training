@@ -53,9 +53,9 @@ def main(args):
             choices=choices,
             k=args.ntrain,
             model_name=args.model_name,
-            device=device,
-            score_mode = args.score_mode
+            device=device
         )
+        evaluator.score_mode = args.score_mode
     else:
         print("Unknown model name (expected qwen family)")
         return -1
@@ -89,8 +89,7 @@ def main(args):
         dev_df=dev_df,
         few_shot=args.few_shot,
         save_result_dir=save_result_dir,
-        cot=args.cot,
-        score_mode = args.score_mode
+        cot=args.cot
     )
     print("Acc:", correct_ratio)
 
