@@ -1,4 +1,12 @@
-# 我想跑的科目（初中）
+# 我想跑的科目
+high_school_biology
+high_school_chemistry
+high_school_physics
+high_school_mathematics
+high_school_politics
+high_school_geography
+high_school_history
+high_school_chinese
 middle_school_biology
 middle_school_chemistry
 middle_school_physics
