@@ -8,6 +8,20 @@ from evaluators.qwen import Qwen_Evaluator
 import time
 choices = ["A", "B", "C", "D"]
 
+# 允许用环境变量指定数据根目录；未设置则默认使用 ./data
+DATA_ROOT = os.environ.get("CEVAL_DATA_DIR", "data")
+
+def resolve_csv(root, split, subject):
+    """兼容两种布局：
+       A) root/val/<sub>_val.csv
+       B) root/<sub>/val.csv
+    """
+    a = os.path.join(root, split, f"{subject}_{split}.csv")
+    b = os.path.join(root, subject, f"{split}.csv")
+    if os.path.exists(a): return a
+    if os.path.exists(b): return b
+    return None
+
 def main(args):
 
     if "qwen" in args.model_name.lower():
@@ -31,15 +45,15 @@ def main(args):
     save_result_dir=os.path.join(r"logs",f"{args.model_name}_{run_date}")
     os.mkdir(save_result_dir)
     print(subject_name)
-    val_file_path=os.path.join('data/val',f'{subject_name}_val.csv')
-    val_df=pd.read_csv(val_file_path)
+    val_file_path = resolve_csv(DATA_ROOT, "val", subject_name)
+    assert val_file_path, f"找不到 {subject_name} 的 val CSV，请检查 CEVAL_DATA_DIR 或数据目录结构"
+    val_df = pd.read_csv(val_file_path)
+
+    dev_df = None
     if args.few_shot:
-        dev_file_path=os.path.join('data/dev',f'{subject_name}_dev.csv')
-        dev_df=pd.read_csv(dev_file_path)
-        correct_ratio = evaluator.eval_subject(subject_name, val_df, dev_df, few_shot=args.few_shot,save_result_dir=save_result_dir,cot=args.cot)
-    else:
-        correct_ratio = evaluator.eval_subject(subject_name, val_df, few_shot=args.few_shot,save_result_dir=save_result_dir)
-    print("Acc:",correct_ratio)
+        dev_file_path = resolve_csv(DATA_ROOT, "dev", subject_name)
+        assert dev_file_path, f"few_shot 需要 dev CSV，但未找到 {subject_name} 的 dev 数据"
+        dev_df = pd.read_csv(dev_file_path)
 
 
 if __name__ == "__main__":
