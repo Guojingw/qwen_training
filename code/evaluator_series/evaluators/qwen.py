@@ -2,7 +2,7 @@
 # 在仓库根或 evaluator_series 目录均可运行：
 import os, re, numpy as np, torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from .evaluator import Evaluator   # 同目录下已有
+from .evaluator import Evaluator
 
 class Qwen_Evaluator(Evaluator):
     def __init__(self, choices, k, model_name: str, device: torch.device | None = None,
@@ -23,11 +23,9 @@ class Qwen_Evaluator(Evaluator):
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.model.eval()
 
-        # 关闭全局 sampling 警告；具体生成时再显式传参
         cfg = self.model.generation_config
         cfg.do_sample = False; cfg.temperature = None; cfg.top_p = None; cfg.top_k = None
 
-        # 从生成文本抽取答案的正则（中文/中英混排常见写法）
         self.answer_patterns = [
             r"所以答案是\s*([ABCD])", r"答案为\s*([ABCD])", r"答案是\s*([ABCD])",
             r"选择\s*([ABCD])", r"答案：\s*([ABCD])", r"选项\s*([ABCD])\s*正确",
@@ -84,7 +82,7 @@ class Qwen_Evaluator(Evaluator):
 
     @torch.no_grad()
     def _generate_text(self, prompt: str, max_new_tokens=128, temperature=0.2, top_p=0.9, do_sample=True) -> str:
-        # few-shot/CoT 推荐适度采样；如需完全确定性可把 do_sample=False
+        # few-shot
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         outputs = self.model.generate(
             **inputs,
