@@ -6,6 +6,7 @@ from evaluators.chatgpt import ChatGPT_Evaluator
 from evaluators.moss import Moss_Evaluator
 from evaluators.chatglm import ChatGLM_Evaluator
 from evaluators.minimax import MiniMax_Evaluator
+from evaluators.qwen import Qwen_Evaluator
 
 import time
 choices = ["A", "B", "C", "D"]
@@ -30,6 +31,16 @@ def main(args):
             os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_device
         device = torch.device("cuda")
         evaluator=ChatGLM_Evaluator(
+            choices=choices,
+            k=args.ntrain,
+            model_name=args.model_name,
+            device=device
+        )
+    elif "qwen" in args.model_name.lower():
+        if args.cuda_device:
+            os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_device
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        evaluator = Qwen_Evaluator(
             choices=choices,
             k=args.ntrain,
             model_name=args.model_name,
