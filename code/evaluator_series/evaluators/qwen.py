@@ -8,9 +8,7 @@ class Qwen_Evaluator(Evaluator):
     def __init__(self, choices, k, model_name: str, device: torch.device | None = None,
                  dtype: str = "fp16"):
         super().__init__(choices, model_name, k)
-        self.tokenizer.padding_side = "left"
-        self.tokenizer.truncation_side = "left"
-
+        
         self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if dtype == "fp16": _dtype = torch.float16
         elif dtype == "bf16": _dtype = torch.bfloat16
@@ -24,6 +22,10 @@ class Qwen_Evaluator(Evaluator):
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.model.eval()
+        
+        self.tokenizer.padding_side = "left"
+        self.tokenizer.truncation_side = "left"
+
 
         cfg = self.model.generation_config
         cfg.do_sample = False; cfg.temperature = None; cfg.top_p = None; cfg.top_k = None
