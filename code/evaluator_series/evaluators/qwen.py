@@ -15,8 +15,8 @@ class Qwen_Evaluator(Evaluator):
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, trust_remote_code=True, torch_dtype=_dtype, device_map="auto"
-        )
+            model_name, trust_remote_code=True, torch_dtype=_dtype
+        ).to(self.device)
         # pad/eos
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
@@ -65,7 +65,7 @@ class Qwen_Evaluator(Evaluator):
 
     @torch.no_grad()
     def _first_step_logits_choice(self, prompt: str) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         gen = self.model.generate(
             **inputs, do_sample=False, max_new_tokens=1,
             return_dict_in_generate=True, output_scores=True
@@ -86,7 +86,7 @@ class Qwen_Evaluator(Evaluator):
     @torch.no_grad()
     def _generate_text(self, prompt: str, max_new_tokens=128, temperature=0.2, top_p=0.9, do_sample=True) -> str:
         # few-shot
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         outputs = self.model.generate(
             **inputs,
             do_sample=do_sample, temperature=temperature, top_p=top_p,
@@ -111,22 +111,15 @@ class Qwen_Evaluator(Evaluator):
             if few_shot:
                 q = self.format_example(line, include_answer=False, cot=cot)
                 full_prompt = prefix + q
-                text = self._generate_text(full_prompt, max_new_tokens=256,
-                                        temperature=0.2 if not cot else 0.7,
-                                        top_p=0.9, do_sample=True)
-                completion = text[len(full_prompt):]
-                pred = self._extract_answer_from_text(completion)
-                if pred is None:
-                    if getattr(self, "score_mode", "logits_first") == "loglik_full":
-                        pred = self._pick_by_full_loglik(full_prompt)
-                    else:
-                        pred = self._first_step_logits_choice(full_prompt)
+                if getattr(self, "score_mode", "loglik_full") == "loglik_full":
+                    pred = self._pick_by_full_loglik(full_prompt)
+                else:
+                    pred = self._first_step_logits_choice(full_prompt)
             else:
-                # zero-shot 也加学科 Header
                 header = self._build_header(disp)
                 q = self.format_example(line, include_answer=False, cot=False)
                 full_prompt = header + q
-                if getattr(self, "score_mode", "logits_first") == "loglik_full":
+                if getattr(self, "score_mode", "loglik_full") == "loglik_full":
                     pred = self._pick_by_full_loglik(full_prompt)
                 else:
                     pred = self._first_step_logits_choice(full_prompt)
@@ -147,7 +140,7 @@ class Qwen_Evaluator(Evaluator):
     # 计算 prompt+target 的条件对数似然：只对 target 部分计分
     @torch.no_grad()
     def _cond_loglik(self, prompt: str, target: str) -> float:
-        tok = self.tokenizer(prompt + target, return_tensors="pt").to(self.model.device)
+        tok = self.tokenizer(prompt + target, return_tensors="pt").to(self.device)
         ids = tok["input_ids"]
         # mask 掉 prompt 部分，只对 target 计 loss
         prompt_len = self.tokenizer(prompt, return_tensors="pt")["input_ids"].shape[1]
