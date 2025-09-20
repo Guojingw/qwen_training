@@ -8,6 +8,9 @@ class Qwen_Evaluator(Evaluator):
     def __init__(self, choices, k, model_name: str, device: torch.device | None = None,
                  dtype: str = "fp16"):
         super().__init__(choices, model_name, k)
+        self.tokenizer.padding_side = "left"
+        self.tokenizer.truncation_side = "left"
+
         self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if dtype == "fp16": _dtype = torch.float16
         elif dtype == "bf16": _dtype = torch.bfloat16
@@ -50,14 +53,17 @@ class Qwen_Evaluator(Evaluator):
                 example += "\n答案："
         return example
 
-    def _build_header(self, subject_title: str) -> str:
-        return (
-            f"以下是中国关于{subject_title}考试的单项选择题，请选出其中的正确答案。"
-            f"\n请只输出最终字母(A/B/C/D)，不要解释。\n\n"
-        )
+    def _build_header(self, subject_title: str, cot: bool = False) -> str:
+        base = f"以下是中国关于{subject_title}考试的单项选择题，请选出其中的正确答案。\n"
+        if cot:
+            base += "请先给出简短思考步骤，然后在最后一行只输出“答案：A/B/C/D”。\n\n"
+        else:
+            base += "请只输出“答案：A/B/C/D”。\n\n"
+        return base
+
 
     def generate_few_shot_prompt(self, subject_title: str, dev_df, cot: bool = False) -> str:
-        prompt = self._build_header(subject_title)
+        prompt = self._build_header(subject_title, cot=cot)
         k = dev_df.shape[0] if self.k == -1 else min(self.k, dev_df.shape[0])
         for i in range(k):
             prompt += self.format_example(dev_df.iloc[i, :], include_answer=True, cot=cot)
@@ -86,7 +92,10 @@ class Qwen_Evaluator(Evaluator):
     @torch.no_grad()
     def _generate_text(self, prompt: str, max_new_tokens=128, temperature=0.2, top_p=0.9, do_sample=True) -> str:
         # few-shot
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        inputs = self.tokenizer(
+            prompt, return_tensors="pt",
+            truncation=True, max_length=4096
+        ).to(self.device)
         outputs = self.model.generate(
             **inputs,
             do_sample=do_sample, temperature=temperature, top_p=top_p,
@@ -95,6 +104,20 @@ class Qwen_Evaluator(Evaluator):
             pad_token_id=self.tokenizer.pad_token_id
         )
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    def _generate_answer(self, full_prompt: str, cot: bool) -> str:
+        # CoT
+        text = self._generate_text(
+            full_prompt,
+            max_new_tokens=256,
+            temperature=0.3 if cot else 0.0,
+            top_p=0.9,
+            do_sample=cot,
+        )
+        completion = text[len(full_prompt):]
+        pred = self._extract_answer_from_text(completion)
+        # 如果抽不出来，就回退到一步 logits 判别
+        return pred or self._first_step_logits_choice(full_prompt)
 
     def eval_subject(self, subject_name, test_df, dev_df=None, few_shot=False, cot=False,
                  save_result_dir=None, subject_title=None):
@@ -108,21 +131,24 @@ class Qwen_Evaluator(Evaluator):
         for i, row in enumerate(test_df.itertuples(index=False)):
             line = row._asdict() if hasattr(row, "_asdict") else test_df.iloc[i, :]
 
+            mode = getattr(self, "score_mode", "logits_first")  # logits_first | loglik_full | generate
+
+            # 先把 full_prompt 拼好：few-shot 用 prefix，zero-shot 加 header
             if few_shot:
                 q = self.format_example(line, include_answer=False, cot=cot)
                 full_prompt = prefix + q
-                if getattr(self, "score_mode", "loglik_full") == "loglik_full":
-                    pred = self._pick_by_full_loglik(full_prompt)
-                else:
-                    pred = self._first_step_logits_choice(full_prompt)
             else:
-                header = self._build_header(disp)
+                header = self._build_header(disp, cot=cot)
                 q = self.format_example(line, include_answer=False, cot=False)
                 full_prompt = header + q
-                if getattr(self, "score_mode", "loglik_full") == "loglik_full":
-                    pred = self._pick_by_full_loglik(full_prompt)
-                else:
-                    pred = self._first_step_logits_choice(full_prompt)
+
+            # 再按 score_mode 决定：生成/完整似然/一步logits
+            if mode == "generate":
+                pred = self._generate_answer(full_prompt, cot=cot)
+            elif mode == "loglik_full":
+                pred = self._pick_by_full_loglik(full_prompt)
+            else:
+                pred = self._first_step_logits_choice(full_prompt)
 
             correct = 1 if pred == answers[i] else 0
             results.append(pred); scores.append(correct)

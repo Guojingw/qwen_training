@@ -125,9 +125,11 @@ if __name__ == "__main__":
     parser.add_argument("--demos_from", choices=["dev", "val"], default="dev",
                         help="few-shot 示例来源，规范推荐 dev")
     parser.add_argument("--cot", action="store_true")
-    parser.add_argument("--score_mode",
-                        choices=["logits_first", "loglik_full"],
-                        default="loglik_full")
+    parser.add_argument(
+        "--score_mode",
+        choices=["logits_first", "loglik_full", "generate"],
+        default="logits_first"
+    )
     parser.add_argument("--dtype", choices=["fp16","bf16","fp32"], default="fp16")
     parser.add_argument("--cuda_device", type=str)
     args = parser.parse_args()
