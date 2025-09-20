@@ -60,11 +60,14 @@ subject 映射表：
       --local-dir ./model/Qwen3-0.6B --local-dir-use-symlinks False
 
 
-# 快速开始（单学科）:
+# 快速开始:
 	
+1. 启动:
 	cd ~/offline_bundle/qwen_training
-	module load Miniforge3 && conda activate qwen312
+	module load Miniforge3 && source activate qwen312
 	export PYTHONPATH=$PWD:$PYTHONPATH
+
+2. 单学科运行:
 	
 	cd code/evaluator_series
 	python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
@@ -75,7 +78,7 @@ subject 映射表：
 	Acc: 36.84
 
 
-# 自定义清单 & 仅在终端打印成绩
+3. 多学科自定义清单 & 仅在终端打印成绩
 
 1）写清单（示例：高中科目）
 	
@@ -89,14 +92,6 @@ subject 映射表：
 	high_school_geography
 	high_school_history
 	high_school_chinese
-	middle_school_biology
-	middle_school_chemistry
-	middle_school_physics
-	middle_school_mathematics
-	middle_school_politics
-	middle_school_geography
-	middle_school_history
-	middle_school_chinese
 	TXT
 
 
@@ -106,24 +101,62 @@ subject 映射表：
 	export CEVAL_DATA_DIR=~/offline_bundle/ceval/ceval-exam
 	export PYTHONPATH=$(git rev-parse --show-toplevel):$PYTHONPATH
 	
-	#zero-shot
-	printf "%-26s %s\n" "subject" "acc"
-	printf "%-26s %s\n" "-------" "----"
-	while read -r s; do
-	  [[ -z "$s" || "$s" =~ ^# ]] && continue
-	  acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
-	                       --subject "$s" 2>&1 | awk '/^Acc:/{a=$2} END{print a}')
-	  printf "%-26s %s\n" "$s" "${acc:-NA}"
-	done < subjects.txt
-	
-	#few-shot
-	
-	printf "%-26s %s\n" "subject" "acc"
-	printf "%-26s %s\n" "-------" "----"
-	while read -r s; do
-	  [[ -z "$s" || "$s" =~ ^# ]] && continue
-	  acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
-	                       --subject "$s" --few_shot -k 5 2>&1 \
-	        | awk '/^Acc:/{a=$2} END{print a}')
-	  printf "%-26s %s\n" "$s" "${acc:-NA}"
-	done < subjects.txt
+A. Zero-shot（答案-only，默认打分：logits_first）
+    printf "%-26s %s\n" "subject" "acc"
+    printf "%-26s %s\n" "-------" "----"
+    while read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                        --subject "$s" 2>&1 | awk '/^Acc:/{a=$2} END{print a}')
+    printf "%-26s %s\n" "$s" "${acc:-NA}"
+    done < subjects.txt
+
+B. Few-shot（答案-only，k=5，默认打分：logits_first）
+    printf "%-26s %s\n" "subject" "acc"
+    printf "%-26s %s\n" "-------" "----"
+    while read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                        --subject "$s" --few_shot -k 5 2>&1 \
+            | awk '/^Acc:/{a=$2} END{print a}')
+    printf "%-26s %s\n" "$s" "${acc:-NA}"
+    done < subjects.txt
+
+C. Few-shot + 稳定判别（loglik_full）
+    printf "%-26s %s\n" "subject" "acc"
+    printf "%-26s %s\n" "-------" "----"
+    while read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                        --subject "$s" --few_shot -k 3 \
+                        --score_mode loglik_full 2>&1 \
+            | awk '/^Acc:/{a=$2} END{print a}')
+    printf "%-26s %s\n" "$s" "${acc:-NA}"
+    done < subjects.txt
+
+
+说明：loglik_full 会对 “答案：A/B/C/D” 四个候选的完整条件似然打分，通常比一步 logits 更稳。k 不宜过大（对 0.6B 常见在 k=1~3 更稳）。
+
+D. Zero-shot + CoT 生成（需已实现 --score_mode generate）
+    printf "%-26s %s\n" "subject" "acc"
+    printf "%-26s %s\n" "-------" "----"
+    while read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                        --subject "$s" --cot \
+                        --score_mode generate 2>&1 \
+            | awk '/^Acc:/{a=$2} END{print a}')
+    printf "%-26s %s\n" "$s" "${acc:-NA}"
+    done < subjects.txt
+
+E. Few-shot + CoT 生成（需已实现 --score_mode generate）
+    printf "%-26s %s\n" "subject" "acc"
+    printf "%-26s %s\n" "-------" "----"
+    while read -r s; do
+    [[ -z "$s" || "$s" =~ ^# ]] && continue
+    acc=$(python eval.py --model_name ~/offline_bundle/model/Qwen3-0.6B \
+                        --subject "$s" --few_shot -k 3 --cot \
+                        --score_mode generate 2>&1 \
+            | awk '/^Acc:/{a=$2} END{print a}')
+    printf "%-26s %s\n" "$s" "${acc:-NA}"
+    done < subjects.txt
