@@ -1,5 +1,5 @@
 # evaluators/qwen.py
-# 在仓库根或 evaluator_series 目录均可运行：
+
 import os, re, numpy as np, torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from .evaluator import Evaluator
@@ -13,7 +13,6 @@ class Qwen_Evaluator(Evaluator):
         elif dtype == "bf16": _dtype = torch.bfloat16
         else: _dtype = torch.float32
 
-        # 允许本地目录或HF模型ID（Base/Instruct均可）
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name, trust_remote_code=True, torch_dtype=_dtype, device_map="auto"
@@ -32,7 +31,7 @@ class Qwen_Evaluator(Evaluator):
             r"最终答案\s*[:：]?\s*([ABCD])", r"\b([ABCD])\b\s*是正确的"
         ]
 
-    # 单题格式化
+    # 单题
     def format_example(self, line, include_answer: bool = True, cot: bool = False) -> str:
         example = line['question']
         for ch in self.choices:
@@ -51,9 +50,14 @@ class Qwen_Evaluator(Evaluator):
                 example += "\n答案："
         return example
 
-    # few-shot 前缀
-    def generate_few_shot_prompt(self, subject: str, dev_df, cot: bool = False) -> str:
-        prompt = f"以下是中国关于{subject}考试的单项选择题，请选出其中的正确答案。\n\n"
+    def _build_header(self, subject_title: str) -> str:
+        return (
+            f"以下是中国关于{subject_title}考试的单项选择题，请选出其中的正确答案。"
+            f"\n请只输出最终字母(A/B/C/D)，不要解释。\n\n"
+        )
+
+    def generate_few_shot_prompt(self, subject_title: str, dev_df, cot: bool = False) -> str:
+        prompt = self._build_header(subject_title)
         k = dev_df.shape[0] if self.k == -1 else min(self.k, dev_df.shape[0])
         for i in range(k):
             prompt += self.format_example(dev_df.iloc[i, :], include_answer=True, cot=cot)
@@ -61,13 +65,12 @@ class Qwen_Evaluator(Evaluator):
 
     @torch.no_grad()
     def _first_step_logits_choice(self, prompt: str) -> str:
-        # 对“答案：”后的第一个生成token做 argmax，取 A/B/C/D 中分数最高者
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         gen = self.model.generate(
             **inputs, do_sample=False, max_new_tokens=1,
             return_dict_in_generate=True, output_scores=True
         )
-        scores = gen.scores[0][0]  # (vocab_size,)
+        scores = gen.scores[0][0]
         letter_ids = [self.tokenizer.encode(x, add_special_tokens=False)[0] for x in ["A","B","C","D"]]
         pred_index = int(torch.argmax(scores[letter_ids]).item())
         return self.choices[pred_index]
@@ -93,11 +96,13 @@ class Qwen_Evaluator(Evaluator):
         )
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    def eval_subject(self, subject_name, test_df, dev_df=None, few_shot=False, cot=False, save_result_dir=None):
+    def eval_subject(self, subject_name, test_df, dev_df=None, few_shot=False, cot=False,
+                 save_result_dir=None, subject_title=None):
+        disp = subject_title or subject_name
         results, scores = [], []
         if few_shot:
             assert dev_df is not None and len(dev_df) > 0, "few_shot 需要提供 dev_df"
-            prefix = self.generate_few_shot_prompt(subject_name, dev_df, cot=cot)
+            prefix = self.generate_few_shot_prompt(disp, dev_df, cot=cot)
 
         answers = list(test_df['answer'])
         for i, row in enumerate(test_df.itertuples(index=False)):
@@ -112,15 +117,15 @@ class Qwen_Evaluator(Evaluator):
                 completion = text[len(full_prompt):]
                 pred = self._extract_answer_from_text(completion)
                 if pred is None:
-                    # 回退：按 score_mode 选择判别器
                     if getattr(self, "score_mode", "logits_first") == "loglik_full":
                         pred = self._pick_by_full_loglik(full_prompt)
                     else:
                         pred = self._first_step_logits_choice(full_prompt)
             else:
-                # zero-shot 分支：直接按 score_mode 选择
+                # zero-shot 也加学科 Header
+                header = self._build_header(disp)
                 q = self.format_example(line, include_answer=False, cot=False)
-                full_prompt = q
+                full_prompt = header + q
                 if getattr(self, "score_mode", "logits_first") == "loglik_full":
                     pred = self._pick_by_full_loglik(full_prompt)
                 else:
@@ -135,7 +140,8 @@ class Qwen_Evaluator(Evaluator):
             out_df = test_df.copy()
             out_df['model_output'] = results
             out_df['correctness'] = scores
-            out_df.to_csv(os.path.join(save_result_dir, f'{subject_name}_test.csv'), index=False, encoding="utf-8")
+            out_df.to_csv(os.path.join(save_result_dir, f'{subject_name}_test.csv'),
+                        index=False, encoding="utf-8")
         return acc_pct
     
     # 计算 prompt+target 的条件对数似然：只对 target 部分计分
