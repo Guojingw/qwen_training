@@ -26,10 +26,10 @@
 └─ README.md
 
 # Setup / 环境准备
-    
+    srun --pty --gpus 6000ada:1 --time 08:00:00 bash
     module load Miniforge3
     conda create -n qwen312 python=3.12 -y
-    conda activate qwen312
+    source activate qwen312
     pip install -U pip
     
     # PyTorch（CUDA 12.4）
@@ -60,10 +60,12 @@ subject 映射表：
       --local-dir ./model/Qwen3-0.6B --local-dir-use-symlinks False
 
 
-# 快速开始:
-	
+# 快速开始: 
+
 1. 启动:
+
 	cd ~/offline_bundle/qwen_training
+	srun --pty --gpus 6000ada:1 --time 08:00:00 bash
 	module load Miniforge3 && source activate qwen312
 	export PYTHONPATH=$PWD:$PYTHONPATH
 
@@ -102,6 +104,7 @@ subject 映射表：
 	export PYTHONPATH=$(git rev-parse --show-toplevel):$PYTHONPATH
 	
 A. Zero-shot（答案-only，默认打分：logits_first）
+
     printf "%-26s %s\n" "subject" "acc"
     printf "%-26s %s\n" "-------" "----"
     while read -r s; do
@@ -112,6 +115,7 @@ A. Zero-shot（答案-only，默认打分：logits_first）
     done < subjects.txt
 
 B. Few-shot（答案-only，k=5，默认打分：logits_first）
+
     printf "%-26s %s\n" "subject" "acc"
     printf "%-26s %s\n" "-------" "----"
     while read -r s; do
@@ -123,6 +127,7 @@ B. Few-shot（答案-only，k=5，默认打分：logits_first）
     done < subjects.txt
 
 C. Few-shot + 稳定判别（loglik_full）
+
     printf "%-26s %s\n" "subject" "acc"
     printf "%-26s %s\n" "-------" "----"
     while read -r s; do
@@ -137,7 +142,8 @@ C. Few-shot + 稳定判别（loglik_full）
 
 说明：loglik_full 会对 “答案：A/B/C/D” 四个候选的完整条件似然打分，通常比一步 logits 更稳。k 不宜过大（对 0.6B 常见在 k=1~3 更稳）。
 
-D. Zero-shot + CoT 生成（需已实现 --score_mode generate）
+D. Zero-shot + CoT 生成
+
     printf "%-26s %s\n" "subject" "acc"
     printf "%-26s %s\n" "-------" "----"
     while read -r s; do
@@ -149,7 +155,8 @@ D. Zero-shot + CoT 生成（需已实现 --score_mode generate）
     printf "%-26s %s\n" "$s" "${acc:-NA}"
     done < subjects.txt
 
-E. Few-shot + CoT 生成（需已实现 --score_mode generate）
+E. Few-shot + CoT 生成
+
     printf "%-26s %s\n" "subject" "acc"
     printf "%-26s %s\n" "-------" "----"
     while read -r s; do
