@@ -1,5 +1,3 @@
-# Qwen3 CEval Evaluator (HF)
-
 # Origin / 代码来源标注
 本仓库的评测思路与部分结构参考并改写自 HKUST-NLP/C-Eval（原仓库包含 LLaMA 等评测器与数据说明）。
 我们将其中“按 A/B/C/D 选项进行比较”的评测方式适配到了 HuggingFace Transformers，并新增对 Qwen3 等 HF 格式模型的直接评测支持。
